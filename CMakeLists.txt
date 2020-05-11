@@ -125,6 +125,6 @@ endif()
 #        DESTINATION .
 #        COMPONENT devel
 #        PATTERN ".svn" EXCLUDE)
-install(FILES license.txt DESTINATION ${INSTALL_MISC_DIR})
-install(FILES readme.txt DESTINATION ${INSTALL_MISC_DIR})
+install(FILES license.txt DESTINATION .)
+install(FILES readme.txt DESTINATION .)
 sfml_export_targets()
