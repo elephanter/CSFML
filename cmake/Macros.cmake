@@ -8,7 +8,7 @@ macro(csfml_add_library target)
 
     # parse the arguments
     cmake_parse_arguments(THIS "" "" "SOURCES;DEPENDS;EXTERNAL_LIBS" ${ARGN})
-
+    set(CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake/Modules/")
     # create the target
     add_library(${target} ${THIS_SOURCES})
 
@@ -31,9 +31,12 @@ macro(csfml_add_library target)
         set_target_properties(${target} PROPERTIES IMPORT_SUFFIX ".a")
     endif()
 
-    # set the version and soversion of the target (for compatible systems -- mostly Linuxes)
-    set_target_properties(${target} PROPERTIES SOVERSION ${VERSION_MAJOR}.${VERSION_MINOR})
-    set_target_properties(${target} PROPERTIES VERSION ${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH})
+    if(NOT SFML_OS_ANDROID)
+    	# set the version and soversion of the target (for compatible systems -- mostly Linuxes)
+    	set_target_properties(${target} PROPERTIES SOVERSION ${VERSION_MAJOR}.${VERSION_MINOR})
+    	set_target_properties(${target} PROPERTIES VERSION ${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH})
+
+    endif()
 
     # set the target's folder (for IDEs that support it, e.g. Visual Studio)
     set_target_properties(${target} PROPERTIES FOLDER "CSFML")
@@ -65,9 +68,63 @@ macro(csfml_add_library target)
     endif()
 
     # add the install rule
-    install(TARGETS ${target}
+    install(TARGETS ${target} EXPORT SFMLConfigExport
             RUNTIME DESTINATION bin COMPONENT bin
             LIBRARY DESTINATION lib${LIB_SUFFIX} COMPONENT bin 
             ARCHIVE DESTINATION lib${LIB_SUFFIX} COMPONENT devel)
+    target_include_directories(${target}
+                               PUBLIC $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
+                               PRIVATE ${PROJECT_SOURCE_DIR}/src)
+    if (CSFML_BUILD_FRAMEWORKS)
+        target_include_directories(${target} INTERFACE $<INSTALL_INTERFACE:SFML.framework>)
+    else()
+        target_include_directories(${target} INTERFACE $<INSTALL_INTERFACE:include>)
+    endif()
+
+    # define SFML_STATIC if the build type is not set to 'shared'
+    if(NOT BUILD_SHARED_LIBS)
+        target_compile_definitions(${target} PUBLIC "SFML_STATIC")
+    endif()
+
 
 endmacro()
+
+# Generate a SFMLConfig.cmake file (and associated files) from the targets registered against
+# the EXPORT name "SFMLConfigExport" (EXPORT parameter of install(TARGETS))
+function(sfml_export_targets)
+    # CMAKE_CURRENT_LIST_DIR or CMAKE_CURRENT_SOURCE_DIR not usable for files that are to be included like this one
+    set(CURRENT_DIR "${PROJECT_SOURCE_DIR}/cmake")
+
+    include(CMakePackageConfigHelpers)
+    write_basic_package_version_file("${CMAKE_CURRENT_BINARY_DIR}/CSFMLConfigVersion.cmake"
+                                     VERSION ${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}
+                                     COMPATIBILITY SameMajorVersion)
+
+    if (BUILD_SHARED_LIBS)
+        set(config_name "Shared")
+    else()
+        set(config_name "Static")
+    endif()
+    set(targets_config_filename "CSFML${config_name}Targets.cmake")
+
+    export(EXPORT SFMLConfigExport
+           FILE "${CMAKE_CURRENT_BINARY_DIR}/${targets_config_filename}")
+
+    if (CSFML_BUILD_FRAMEWORKS)
+	    set(config_package_location "CSFML.framework/Resources/CMake")
+    else()
+	    set(config_package_location lib${LIB_SUFFIX}/cmake/CSFML)
+    endif()
+    configure_package_config_file("${CURRENT_DIR}/CSFMLConfig.cmake.in" "${CMAKE_CURRENT_BINARY_DIR}/CSFMLConfig.cmake"
+        INSTALL_DESTINATION "${config_package_location}")
+
+    install(EXPORT SFMLConfigExport
+            FILE ${targets_config_filename}
+            DESTINATION ${config_package_location})
+
+    install(FILES "${CMAKE_CURRENT_BINARY_DIR}/CSFMLConfig.cmake"
+	    "${CMAKE_CURRENT_BINARY_DIR}/CSFMLConfigVersion.cmake"
+            DESTINATION ${config_package_location}
+            COMPONENT devel)
+endfunction()
+

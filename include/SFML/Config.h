@@ -52,6 +52,11 @@
     // Windows
     #define CSFML_SYSTEM_WINDOWS
 
+#elif defined(__ANDROID__)
+
+    // Android
+    #define CSFML_SYSTEM_ANDROID
+
 #elif defined(linux) || defined(__linux)
 
     // Linux

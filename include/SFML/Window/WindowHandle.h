@@ -46,6 +46,11 @@
     // Window handle is Window (unsigned long) on Unix - X11
     typedef unsigned long sfWindowHandle;
 
+#elif defined(CSFML_SYSTEM_ANDROID)
+
+    // Window handle is ANativeWindow* (void*) on Android
+    typedef void* sfWindowHandle;
+
 #elif defined(CSFML_SYSTEM_MACOS)
 
     // Window handle is NSWindow (void*) on Mac OS X - Cocoa

@@ -28,11 +28,43 @@ set(VERSION_PATCH 0)
 include_directories(${CMAKE_SOURCE_DIR}/include)
 
 # add an option for choosing the build type (shared or static)
-csfml_set_option(BUILD_SHARED_LIBS TRUE BOOL "TRUE to build CSFML as shared libraries, FALSE to build it as static libraries")
+if(NOT (SFML_OS_IOS OR SFML_OS_ANDROID))
+    csfml_set_option(BUILD_SHARED_LIBS TRUE BOOL "TRUE to build SFML as shared libraries, FALSE to build it as static libraries")
+else()
+    if(SFML_OS_IOS)
+        set(BUILD_SHARED_LIBS FALSE)
+    elseif(SFML_OS_ANDROID)
+        set(BUILD_SHARED_LIBS TRUE)
+    endif()
+endif()
 
 # add an option for building the API documentation
 csfml_set_option(CSFML_BUILD_DOC FALSE BOOL "TRUE to generate the API documentation, FALSE to ignore it")
 
+# Android options
+if(SFML_OS_ANDROID)
+	set(CMAKE_INSTALL_PREFIX ${CMAKE_ANDROID_NDK}/sources/third_party/csfml)
+	# we install libs in a subdirectory named after the ABI (lib/mips/*.so)
+	set(LIB_SUFFIX "/${CMAKE_ANDROID_ARCH_ABI}")
+	    # pass shared STL configuration (if any)
+    	if (CMAKE_ANDROID_STL_TYPE MATCHES "_shared")
+        	add_definitions("-DSTL_LIBRARY=${CMAKE_ANDROID_STL_TYPE}")
+    	#    if(NOT CMAKE_ANDROID_STL_TYPE MATCHES "c\\+\\+_shared")
+    	#        message("Android: Using ${CMAKE_ANDROID_STL_TYPE} as STL. Set CMAKE_ANDROID_STL_TYPE to c++_shared, if there are any issues.")
+    	#    endif()
+    	else()
+    	#    message(WARNING "Android: You're using a static STL (${CMAKE_ANDROID_STL_TYPE}). Set CMAKE_ANDROID_STL_TYPE to c++_shared, if there are any issues.")
+    	endif()
+
+		    # let the user switch ABIs
+    	set(ANDROID_ABI "armeabi-v7a" CACHE STRING "Look at the NDK docs for currently supported ABIs")
+
+    	# this is a workaround to compile sfml-activity without the stl library as a dependency
+    	# we save the original compilation command line to restore it later in Macro.cmake
+    	set(CMAKE_CXX_CREATE_SHARED_LIBRARY_WITH_STL ${CMAKE_CXX_CREATE_SHARED_LIBRARY})
+    	set(CMAKE_CXX_CREATE_SHARED_LIBRARY_WITHOUT_STL "<CMAKE_CXX_COMPILER> <CMAKE_SHARED_LIBRARY_CXX_FLAGS> <LANGUAGE_COMPILE_FLAGS> <LINK_FLAGS> <CMAKE_SHARED_LIBRARY_CREATE_CXX_FLAGS> <SONAME_FLAG><TARGET_SONAME> -o <TARGET> <OBJECTS> <LINK_LIBRARIES>")
+
+endif()
 # add an option for linking to sfml either statically or dynamically
 # default on windows to static and on other platforms to dynamic
 if(SFML_OS_WINDOWS)
@@ -44,6 +76,20 @@ csfml_set_option(CSFML_LINK_SFML_STATICALLY ${LINK_STATICALLY_DEFAULT} BOOL "TRU
 
 # disable the rpath stuff
 set(CMAKE_SKIP_BUILD_RPATH TRUE)
+
+# Install directories
+# For miscellaneous files
+if(SFML_OS_WINDOWS OR SFML_OS_IOS)
+    set(DEFAULT_INSTALL_MISC_DIR .)
+elseif(SFML_OS_LINUX OR SFML_OS_FREEBSD OR SFML_OS_OPENBSD)
+    set(DEFAULT_INSTALL_MISC_DIR share/SFML)
+elseif(SFML_OS_MACOSX)
+	set(DEFAULT_INSTALL_MISC_DIR /usr/local/share/CSFML)
+elseif(SFML_OS_ANDROID)
+    set(DEFAULT_INSTALL_MISC_DIR ${CMAKE_ANDROID_NDK}/sources/third_party/sfml)
+endif()
+csfml_set_option(SFML_MISC_INSTALL_PREFIX "${DEFAULT_INSTALL_MISC_DIR}" PATH "Prefix installation path for miscellaneous files")
+
 
 # define an option for choosing between static and dynamic C runtime (Windows only)
 if(SFML_OS_WINDOWS)
@@ -67,10 +113,18 @@ if(CSFML_BUILD_DOC)
     add_subdirectory(doc)
 endif()
 
+if(SFML_OS_ANDROID)
+
+    # install Android.mk so the NDK knows how to set up SFML
+    install(FILES src/SFML/Android.mk DESTINATION .)
+
+endif()
+
 # setup the install rules
-install(DIRECTORY include
-        DESTINATION .
-        COMPONENT devel
-        PATTERN ".svn" EXCLUDE)
+#install(DIRECTORY include
+#        DESTINATION .
+#        COMPONENT devel
+#        PATTERN ".svn" EXCLUDE)
 install(FILES license.txt DESTINATION ${INSTALL_MISC_DIR})
 install(FILES readme.txt DESTINATION ${INSTALL_MISC_DIR})
+sfml_export_targets()
